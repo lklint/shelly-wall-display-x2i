@@ -11,6 +11,8 @@ Both dashboards use a full-bleed background image with a right-hand icon nav rai
 | **power-shed/** | Solar + battery monitoring, live energy flow diagram, 3 cameras |
 | **pump-shed/** | Pump on/off control, tank level gauge, 7-day trend graph, 2 cameras |
 
+Each folder contains a `-dashboard.yaml`, a `-background.png`, and a `-background.svg` (the editable vector source for the PNG).
+
 ---
 
 ## Before you start
@@ -32,15 +34,15 @@ You'll need:
 
 ### 1. Upload the background image
 
-Each folder has its own `background.png` (and a `.svg` source, if you want to tweak the vector version yourself). Copy the PNG into your Home Assistant `www` folder — this is usually `/config/www/`, though depending on how you access your HA filesystem (Samba share, File Editor add-on, SSH) it may just show up as a folder called `www`.
+Each folder has its own `<shed>-background.png` (and a matching `.svg` source, if you want to tweak the vector version yourself). Copy the PNG into your Home Assistant `www` folder — this is usually `/config/www/`, though depending on how you access your HA filesystem (Samba share, File Editor add-on, SSH) it may just show up as a folder called `www`.
 
 Anything in that folder becomes accessible at `http://<your-ha-ip>:8123/local/<filename>`. Once uploaded, check it loads by visiting that URL directly in a browser — if you get a 404, you've uploaded to the wrong folder.
 
-> Both dashboards expect the file to be named exactly `background.png`. If you rename it, update the `background: url(...)` lines in the YAML to match (there are 3–4 of these per file, one per view).
+> The YAML files already point at `/local/power-shed-background.png` and `/local/pump-shed-background.png` respectively — keep the filenames as-is, or rename both the uploaded file and the `background: url(...)` lines in the YAML to match (there are 3–4 of these per file, one per view).
 
 ### 2. Create the dashboard
 
-In Home Assistant: **Settings → Dashboards → + Add Dashboard → New dashboard from scratch**, give it a name, then open it and use the **three-dot menu (top right) → Edit Dashboard → three-dot menu again → Edit in YAML**. Delete whatever's there and paste in the contents of `dashboard.yaml`.
+In Home Assistant: **Settings → Dashboards → + Add Dashboard → New dashboard from scratch**, give it a name, then open it and use the **three-dot menu (top right) → Edit Dashboard → three-dot menu again → Edit in YAML**. Delete whatever's there and paste in the contents of the relevant `-dashboard.yaml` file.
 
 ### 3. Replace the placeholder entities
 
@@ -97,7 +99,7 @@ Also update the gauge's `max:` value (search for `SET THIS` in the YAML) to matc
 ## Customizing
 
 - **Colors**: both dashboards use a 4-color palette (`#fccc38`, `#f3393d`, `#17afdc`, `#5358a1`) throughout the templates and background art. Find-and-replace these hex codes to re-theme.
-- **Background art**: each `background.svg` is hand-built (not AI-generated raster art) — soft corner glows, a diagonal stripe texture, and a themed motif (lightning bolts for power, water drops for pump), all layered over a dark base. Edit the SVG directly and re-export to PNG, or swap in your own image entirely.
+- **Background art**: each `<shed>-background.svg` is hand-built (not AI-generated raster art) — soft corner glows, a diagonal stripe texture, and a themed motif (lightning bolts for power, water drops for pump), all layered over a dark base. Edit the SVG directly and re-export to PNG, or swap in your own image entirely.
 - **Adding more tiles**: both files use two reusable `button_card_templates` — `stattile` (numeric readouts) and `toggletile` (on/off switches) — so adding another tile is usually just copying an existing block and changing the `entity`/`name`/`icon`.
 - **Screen size**: built for the X2i's 1440×720 panel. Should mostly work on other panoramic displays, but tile sizing and the graph height constraints were tuned against this specific resolution.
 
