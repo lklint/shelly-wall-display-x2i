@@ -1,0 +1,701 @@
+# =============================================================================
+# Power Shed Dashboard — Shelly Wall Display X2i (1440x720)
+# =============================================================================
+# See README.md in this repo for full setup instructions.
+#
+# REQUIRES (install both via HACS > Frontend before loading this dashboard):
+#   - button-card   https://github.com/custom-cards/button-card
+#   - card-mod      https://github.com/thomasloven/lovelace-card-mod
+#
+# Layout: each view is ONE custom:button-card using a CSS grid —
+#   "content" area (flexible width) + "nav" area (fixed 84px) pinned right.
+# The nav rail replaces HA's own header tabs, so hide_header is set to true.
+#
+# BEFORE USE: every entity_id in this file is a placeholder (e.g.
+# sensor.battery_state_of_charge). Find-and-replace them with your own —
+# see the "Entities used" table in README.md for the full list.
+# =============================================================================
+
+title: Power Shed
+
+# kiosk_mode requires the "Kiosk Mode" HACS integration (github.com/NemesisRE/kiosk-mode).
+# hide_sidebar removes HA's left sidebar. hide_header removes HA's own top tab bar —
+# we hide it because the button-card nav rail (bottom of this file) replaces it.
+kiosk_mode:
+  admin_settings:
+    hide_header: false
+    hide_sidebar: false
+  hide_header: true          # our own nav rail replaces the tab bar
+  hide_sidebar: true
+
+# -----------------------------------------------------------------------------
+# REUSABLE TEMPLATES
+# Every tile/button on this dashboard is built from one of these three templates,
+# so the look stays consistent and you only need to change styling in one place.
+# -----------------------------------------------------------------------------
+button_card_templates:
+
+  # A single nav rail icon, inactive state. Transparent background, muted icon color.
+  navbtn:
+    show_icon: true
+    show_name: false
+    show_label: false
+    show_state: false
+    styles:
+      card:
+        - width: 60px
+        - height: 60px
+        - border-radius: 16px
+        - background: transparent
+        - border: none
+        - box-shadow: none
+        - display: flex
+        - align-items: center
+        - justify-content: center
+        - margin: 6px auto
+      icon:
+        - width: 28px
+        - height: 28px
+        - color: "#E8ECE6"
+
+  # Same as navbtn, but with a soft amber highlight — used for whichever page
+  # you're currently on. Each view's nav list manually marks its own icon with
+  # this template instead of navbtn; there's no automatic "current page" detection.
+  navbtn_active:
+    show_icon: true
+    show_name: false
+    show_label: false
+    show_state: false
+    styles:
+      card:
+        - width: 60px
+        - height: 60px
+        - border-radius: 16px
+        - background: "rgba(255, 184, 77, 0.16)"
+        - border: none
+        - box-shadow: none
+        - display: flex
+        - align-items: center
+        - justify-content: center
+        - margin: 6px auto
+      icon:
+        - width: 28px
+        - height: 28px
+        - color: "#FFB84D"
+
+  # A numeric readout tile — icon on top, name, then a big bold value below
+  # (e.g. "Battery" / "82.40%"). Used throughout the Overview and Energy tabs.
+  #
+  # NOTE on img_cell: button-card's icon sits inside its own "img_cell" container,
+  # and if that container isn't given an explicit size, it can collapse to zero
+  # height — the icon will have a color but nothing visible to show it in. Giving
+  # img_cell explicit width/height/display:flex is what makes the icon actually
+  # render. Skipping this was the single biggest time-sink building this dashboard.
+  stattile:
+    show_icon: true
+    show_name: true
+    show_label: true
+    show_state: false
+    color_type: icon   # lets a top-level "color:" field tint the icon
+    size: 40px
+    styles:
+      card:
+        - background: "rgba(255, 255, 255, 0.05)"
+        - border-radius: 16px
+        - border: none
+        - box-shadow: none
+        - padding: 10px 6px
+        - height: 100%
+      img_cell:
+        - width: 100%
+        - height: 40px
+        - display: flex
+        - align-items: center
+        - justify-content: center
+        - margin-bottom: 6px
+      name:
+        - font-size: 18px
+        - font-weight: 600
+        - color: "#cfd3d9"
+        - margin-bottom: 2px
+      label:
+        - font-size: 30px
+        - font-weight: 700
+        - color: "#f4f6f2"
+
+views:
+  # ---------------------------------------------------------------------
+  # VIEW 1: OVERVIEW
+  # ---------------------------------------------------------------------
+  - title: Overview
+    path: overview
+    icon: mdi:home-lightning-bolt
+    type: panel   # panel = one card fills the whole screen width, no HA margins
+    cards:
+      # ---------------------------------------------------------------------
+      # PAGE SKELETON — this same pattern repeats at the top of every view in
+      # this file. It's a single button-card using CSS Grid to split the
+      # screen into two areas: "content" (everything on the left, scrollable
+      # if it overflows) and "nav" (the fixed 84px icon rail on the right).
+      # Only the actual tiles inside custom_fields.content differ per view —
+      # the grid/background/nav-rail plumbing below is identical everywhere.
+      # ---------------------------------------------------------------------
+      - type: custom:button-card
+        show_name: false
+        show_icon: false
+        show_label: false
+        styles:
+          card:
+            - width: 100vw
+            - height: 100vh
+            - background: url('/local/power-shed-background.png') center/cover
+            - padding: 0
+            - margin: 0
+            - border: none
+            - box-shadow: none
+            - overflow: hidden
+          grid:
+            - display: grid
+            - grid-template-areas: '"content nav"'
+            - grid-template-columns: 1fr 84px   # content flexes, nav rail is fixed-width
+            - grid-template-rows: minmax(0, 1fr) # minmax(0,...) lets content scroll instead of overflowing the screen
+            - height: 100vh
+            - width: 100vw
+          custom_fields:
+            content:
+              - grid-area: content
+              - overflow-y: auto              # scrolls if a view's content is taller than the screen
+              - min-height: 0
+              - align-content: start
+              - padding: 14px
+              - -webkit-overflow-scrolling: touch  # needed for smooth touch-scroll in the X2i's Android WebView
+              - touch-action: pan-y
+            nav:
+              - grid-area: nav
+              - display: flex
+              - flex-direction: column
+              - align-items: center
+              - justify-content: center
+              - background: "rgba(0, 0, 0, 0.25)"
+              - height: 100vh
+        custom_fields:
+          # content: the actual dashboard tiles for this view, as a nested vertical-stack card
+          content:
+            card:
+              type: vertical-stack
+              cards:
+                # Shed light — a toggle built directly on custom:button-card rather than the
+                # stattile template, since it needs show_state (On/Off) + tap_action instead
+                # of a custom numeric label.
+                - type: custom:button-card
+                  entity: light.shed_light
+                  icon: mdi:ceiling-light
+                  name: Shed Light
+                  show_name: true
+                  show_state: true
+                  show_icon: true
+                  show_label: false
+                  color_type: icon
+                  color: auto
+                  size: 40px
+                  tap_action:
+                    action: toggle
+                  styles:
+                    card:
+                      - background: "rgba(255, 255, 255, 0.05)"
+                      - border-radius: 16px
+                      - border: none
+                      - box-shadow: none
+                      - padding: 10px 16px
+                      - height: 100%
+                    # This card doesn't use the stattile template because it needs a
+                    # different shape: icon on the left, name+state stacked beside it,
+                    # rather than icon-on-top. "i n" / "i s" means the icon spans both
+                    # rows on the left, name sits top-right, state sits bottom-right.
+                    grid:
+                      - grid-template-areas: '"i n" "i s"'
+                      - grid-template-columns: 56px 1fr
+                      - grid-template-rows: auto auto
+                      - align-items: center
+                      - row-gap: 2px
+                      - column-gap: 12px
+                      - justify-items: start
+                    img_cell:
+                      - width: 40px
+                      - height: 40px
+                      - display: flex
+                      - align-items: center
+                      - justify-content: center
+                    name:
+                      - font-size: 18px
+                      - font-weight: 600
+                      - color: "#cfd3d9"
+                      - justify-self: start
+                    state:
+                      - font-size: 22px
+                      - font-weight: 700
+                      - color: "#f4f6f2"
+                      - justify-self: start
+
+                # Row 1 of stat tiles: Battery / Solar / Battery Flow.
+                #
+                # "label:" and "color:" below use button-card's own JavaScript template
+                # syntax — [[[ ... ]]] — NOT Home Assistant's usual Jinja {{ }} templates.
+                # This is what lets a single tile pull in a live entity value, format it
+                # (e.g. round to 2 decimals, append a unit), and pick its own color based
+                # on a threshold, all without any Jinja templates or Home Assistant
+                # template sensors. `states['entity_id']?.state` reads a live state; the
+                # `?.` avoids an error if the entity doesn't exist yet on first load.
+                - type: horizontal-stack
+                  cards:
+                    - type: custom:button-card
+                      template: stattile
+                      entity: sensor.battery_state_of_charge
+                      name: Battery
+                      icon: mdi:battery-charging-80
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.battery_state_of_charge']?.state)
+                        || 0; return v.toFixed(2) + '%'; ]]]
+                      color: >
+                        [[[ var soc =
+                        parseFloat(states['sensor.battery_state_of_charge']?.state)
+                        || 0; if (soc < 30) return '#f3393d'; if (soc < 60)
+                        return '#fccc38'; return '#4caf50'; ]]]
+
+                    - type: custom:button-card
+                      template: stattile
+                      entity: binary_sensor.solar_generating
+                      name: Solar
+                      icon: mdi:solar-power-variant
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.solar_power']?.state)
+                        || 0; return v.toFixed(2) + ' kW'; ]]]
+                      color: "#fccc38"
+
+                    - type: custom:button-card
+                      template: stattile
+                      entity: binary_sensor.battery_charging
+                      name: Battery Flow
+                      icon: >
+                        [[[ var p =
+                        parseFloat(states['sensor.battery_power']?.state)
+                        || 0; return p > 0 ? 'mdi:battery-arrow-up' :
+                        'mdi:battery-arrow-down'; ]]]
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.battery_power']?.state)
+                        || 0; return v.toFixed(2) + ' kW'; ]]]
+                      color: >
+                        [[[ var p =
+                        parseFloat(states['sensor.battery_power']?.state)
+                        || 0; return p > 0 ? '#4caf50' : '#ff9800'; ]]]
+
+                - type: horizontal-stack
+                  cards:
+                    - type: custom:button-card
+                      template: stattile
+                      entity: sensor.daily_solar_yield
+                      name: Today's Yield
+                      icon: mdi:weather-sunny
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.daily_solar_yield']?.state)
+                        || 0; return v.toFixed(2) + ' kWh'; ]]]
+                      color: "#fccc38"
+
+                    - type: custom:button-card
+                      template: stattile
+                      entity: sensor.pv_voltage
+                      name: PV Voltage
+                      icon: mdi:sine-wave
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.pv_voltage']?.state)
+                        || 0; return v.toFixed(2) + ' V'; ]]]
+                      color: "#17afdc"
+
+                    - type: custom:button-card
+                      template: stattile
+                      entity: sensor.pv_current
+                      name: PV Current
+                      icon: mdi:current-dc
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.pv_current']?.state)
+                        || 0; return v.toFixed(2) + ' A'; ]]]
+                      color: "#17afdc"
+
+          # nav: the right-side icon rail, identical structure on every view — a
+          # vertical-stack of 4 nav buttons, one per page. Whichever page you're
+          # currently viewing uses the navbtn_active template instead of navbtn;
+          # this is set manually per view rather than detected automatically, so
+          # if you add a 5th page, remember to update the icon list on ALL views,
+          # not just the new one.
+          nav:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: navbtn_active
+                  icon: mdi:home-lightning-bolt
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/overview
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:solar-power-variant
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/energy
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:transmission-tower
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/flow
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:cctv
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/camera
+
+  # ---------------------------------------------------------------------
+  # VIEW 2: ENERGY
+  # ---------------------------------------------------------------------
+  # Same page-skeleton pattern as Overview above (see its comments for details
+  # on the grid/nav-rail mechanism). This view adds two native "gauge" cards
+  # (Home Assistant's built-in card type — not button-card) for a quick radial
+  # glance at battery % and solar output, plus the same-styled Today's
+  # Yield/Voltage/Current tiles repeated from Overview for convenience.
+  - title: Energy
+    path: energy
+    icon: mdi:solar-power-variant
+    type: panel
+    cards:
+      - type: custom:button-card
+        show_name: false
+        show_icon: false
+        show_label: false
+        styles:
+          card:
+            - width: 100vw
+            - height: 100vh
+            - background: url('/local/power-shed-background.png') center/cover
+            - padding: 0
+            - margin: 0
+            - border: none
+            - box-shadow: none
+            - overflow: hidden
+          grid:
+            - display: grid
+            - grid-template-areas: '"content nav"'
+            - grid-template-columns: 1fr 84px
+            - grid-template-rows: minmax(0, 1fr)
+            - height: 100vh
+            - width: 100vw
+          custom_fields:
+            content:
+              - grid-area: content
+              - overflow-y: auto
+              - min-height: 0
+              - align-content: start
+              - padding: 14px
+              - -webkit-overflow-scrolling: touch
+              - touch-action: pan-y
+            nav:
+              - grid-area: nav
+              - display: flex
+              - flex-direction: column
+              - align-items: center
+              - justify-content: center
+              - background: "rgba(0, 0, 0, 0.25)"
+              - height: 100vh
+        custom_fields:
+          content:
+            card:
+              type: vertical-stack
+              cards:
+                - type: horizontal-stack
+                  cards:
+                    - type: gauge
+                      entity: sensor.battery_state_of_charge
+                      name: Battery
+                      min: 0
+                      max: 100
+                      severity:
+                        green: 60
+                        yellow: 30
+                        red: 0
+                    - type: gauge
+                      entity: sensor.solar_power
+                      name: Solar
+                      min: 0
+                      max: 25
+                      severity:
+                        green: 15
+                        yellow: 5
+                        red: 0
+                      needle: false
+
+                - type: horizontal-stack
+                  cards:
+                    - type: custom:button-card
+                      template: stattile
+                      entity: sensor.daily_solar_yield
+                      name: Today's Yield
+                      icon: mdi:weather-sunny
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.daily_solar_yield']?.state)
+                        || 0; return v.toFixed(2) + ' kWh'; ]]]
+                      color: "#fccc38"
+
+                    - type: custom:button-card
+                      template: stattile
+                      entity: sensor.pv_voltage
+                      name: PV Voltage
+                      icon: mdi:sine-wave
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.pv_voltage']?.state)
+                        || 0; return v.toFixed(2) + ' V'; ]]]
+                      color: "#17afdc"
+
+                    - type: custom:button-card
+                      template: stattile
+                      entity: sensor.pv_current
+                      name: PV Current
+                      icon: mdi:current-dc
+                      label: >
+                        [[[ var v =
+                        parseFloat(states['sensor.pv_current']?.state)
+                        || 0; return v.toFixed(2) + ' A'; ]]]
+                      color: "#17afdc"
+
+          nav:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:home-lightning-bolt
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/overview
+                - type: custom:button-card
+                  template: navbtn_active
+                  icon: mdi:solar-power-variant
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/energy
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:transmission-tower
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/flow
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:cctv
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/camera
+
+  # ---------------------------------------------------------------------
+  # VIEW 3: FLOW (native Energy dashboard distribution card)
+  # ---------------------------------------------------------------------
+  - title: Flow
+    path: flow
+    icon: mdi:transmission-tower
+    type: panel
+    cards:
+      - type: custom:button-card
+        show_name: false
+        show_icon: false
+        show_label: false
+        styles:
+          card:
+            - width: 100vw
+            - height: 100vh
+            - background: url('/local/power-shed-background.png') center/cover
+            - padding: 0
+            - margin: 0
+            - border: none
+            - box-shadow: none
+            - overflow: hidden
+          grid:
+            - display: grid
+            - grid-template-areas: '"content nav"'
+            - grid-template-columns: 1fr 84px
+            - grid-template-rows: minmax(0, 1fr)
+            - height: 100vh
+            - width: 100vw
+          custom_fields:
+            content:
+              - grid-area: content
+              - overflow-y: auto
+              - min-height: 0
+              - align-content: start
+              - padding: 14px
+              - -webkit-overflow-scrolling: touch
+              - touch-action: pan-y
+            nav:
+              - grid-area: nav
+              - display: flex
+              - flex-direction: column
+              - align-items: center
+              - justify-content: center
+              - background: "rgba(0, 0, 0, 0.25)"
+              - height: 100vh
+        custom_fields:
+          content:
+            card:
+              type: vertical-stack
+              cards:
+                # Native HA card — needs NO entity_id here, it automatically pulls
+                # from whatever sources you've configured under Settings > Dashboards
+                # > Energy. If that's not set up, this card renders empty.
+                # link_dashboard:false hides its built-in "go to Energy dashboard"
+                # link, since that would navigate outside this custom dashboard.
+                - type: energy-distribution
+                  link_dashboard: false
+
+          nav:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:home-lightning-bolt
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/overview
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:solar-power-variant
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/energy
+                - type: custom:button-card
+                  template: navbtn_active
+                  icon: mdi:transmission-tower
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/flow
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:cctv
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/camera
+  # ---------------------------------------------------------------------
+  # VIEW 4: CAMERA
+  # ---------------------------------------------------------------------
+  - title: Camera
+    path: camera
+    icon: mdi:cctv
+    type: panel
+    cards:
+      - type: custom:button-card
+        show_name: false
+        show_icon: false
+        show_label: false
+        styles:
+          card:
+            - width: 100vw
+            - height: 100vh
+            - background: url('/local/power-shed-background.png') center/cover
+            - padding: 0
+            - margin: 0
+            - border: none
+            - box-shadow: none
+            - overflow: hidden
+          grid:
+            - display: grid
+            - grid-template-areas: '"content nav"'
+            - grid-template-columns: 1fr 84px
+            - grid-template-rows: minmax(0, 1fr)
+            - height: 100vh
+            - width: 100vw
+          custom_fields:
+            content:
+              - grid-area: content
+              - overflow-y: auto
+              - min-height: 0
+              - align-content: start
+              - padding: 14px
+              - -webkit-overflow-scrolling: touch
+              - touch-action: pan-y
+            nav:
+              - grid-area: nav
+              - display: flex
+              - flex-direction: column
+              - align-items: center
+              - justify-content: center
+              - background: "rgba(0, 0, 0, 0.25)"
+              - height: 100vh
+        custom_fields:
+          content:
+            # Three native picture-entity cards side by side via horizontal-stack —
+            # chosen over stacking vertically because the X2i's screen is short
+            # and wide, so three-across fits far better than three tall rows would.
+            card:
+              type: horizontal-stack
+              cards:
+                - show_state: true
+                  show_name: true
+                  camera_view: live
+                  fit_mode: cover
+                  type: picture-entity
+                  entity: camera.shed_camera_1
+                  name: Power Shed 1
+                  aspect_ratio: "4:3"
+                - show_state: true
+                  show_name: true
+                  camera_view: live
+                  fit_mode: cover
+                  type: picture-entity
+                  entity: camera.shed_camera_2
+                  name: Power Shed 2
+                  aspect_ratio: "4:3"
+                - show_state: true
+                  show_name: true
+                  camera_view: live
+                  fit_mode: cover
+                  type: picture-entity
+                  entity: camera.shed_camera_3
+                  name: Power Shed Mini
+                  aspect_ratio: "4:3"
+
+          nav:
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:home-lightning-bolt
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/overview
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:solar-power-variant
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/energy
+                - type: custom:button-card
+                  template: navbtn
+                  icon: mdi:transmission-tower
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/flow
+                - type: custom:button-card
+                  template: navbtn_active
+                  icon: mdi:cctv
+                  tap_action:
+                    action: navigate
+                    navigation_path: /power-shed/camera
+
